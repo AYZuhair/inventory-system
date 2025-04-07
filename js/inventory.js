@@ -172,3 +172,42 @@ async function submitRequest() {
         console.error('Error submitting request:', error);
     }
 }
+
+async function createStaffAccount() {
+    const username = document.getElementById('newStaffUsername').value;
+    const password = document.getElementById('newStaffPassword').value;
+    const role = 'staff'; // Fixed to staff only
+
+    if (!username || !password) {
+        alert('Please enter both username and password');
+        return;
+    }
+
+    try {
+        const checkResponse = await fetch('/users');
+        const text = await checkResponse.text();
+        const users = text.trim().split('\n').map(line => line.split(':')[0]);
+
+        if (users.includes(username)) {
+            alert('Username already exists!');
+            return;
+        }
+
+        const response = await fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, role })
+        });
+
+        if (response.ok) {
+            alert('Staff account created successfully!');
+            document.getElementById('newStaffUsername').value = '';
+            document.getElementById('newStaffPassword').value = '';
+        } else {
+            alert('Failed to create staff account');
+        }
+    } catch (error) {
+        console.error('Error creating staff account:', error);
+        alert('Error during staff account creation');
+    }
+}

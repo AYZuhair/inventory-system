@@ -10,6 +10,14 @@
     <div class="container">
         <h1>Admin Panel</h1>
         <button id="logout">Logout</button>
+        
+        <div class="staff-form">
+            <h2>Create Staff Account</h2>
+            <input type="text" id="newStaffUsername" placeholder="Staff Username">
+            <input type="password" id="newStaffPassword" placeholder="Staff Password">
+            <button onclick="createStaffAccount()">Create Staff</button>
+        </div>
+
         <div class="inventory-form">
             <h2>Add/Edit Item</h2>
             <input type="hidden" id="editId">
@@ -20,6 +28,7 @@
             <button onclick="saveItem()">Save Item</button>
             <button onclick="clearForm()" id="clearBtn">Clear Form</button>
         </div>
+        
         <div class="inventory-list">
             <h2>Inventory</h2>
             <table>
