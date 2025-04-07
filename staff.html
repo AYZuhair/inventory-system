@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Panel</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Staff Panel</h1>
+        <button id="logout">Logout</button>
+        <div class="inventory-list">
+            <h2>Inventory</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTable"></tbody>
+            </table>
+        </div>
+        <div class="request-form">
+            <h2>Request Quantity Adjustment</h2>
+            <select id="requestItemId"></select>
+            <input type="number" id="requestQty" placeholder="New Quantity">
+            <textarea id="requestReason" placeholder="Reason for change"></textarea>
+            <button onclick="submitRequest()">Submit Request</button>
+        </div>
+    </div>
+    <script src="js/inventory.js"></script>
+</body>
+</html>

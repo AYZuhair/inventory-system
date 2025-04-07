@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory System - Login</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Inventory System Login</h1>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <select id="role">
+                <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
+            </select>
+            <button type="submit">Login</button>
+        </form>
+        <p>Not registered? <a href="#" id="showSignup">Sign Up</a></p>
+        
+        <div id="signupForm" style="display: none;">
+            <h2>Sign Up</h2>
+            <form id="registerForm">
+                <input type="text" id="newUsername" placeholder="New Username" required>
+                <input type="password" id="newPassword" placeholder="New Password" required>
+                <select id="newRole">
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
+                </select>
+                <button type="submit">Register</button>
+            </form>
+        </div>
+    </div>
+    <script src="js/auth.js"></script>
+</body>
+</html>
