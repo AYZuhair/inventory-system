@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadInventory();
+    if (window.location.pathname.includes('admin.html')) {
+        loadAdminNotifications();
+    }
 });
 
 async function loadInventory() {
@@ -34,6 +37,7 @@ async function loadInventory() {
         }
     } catch (error) {
         console.error('Error loading inventory:', error);
+        showFeedback('Failed to load inventory', false);
     }
 }
 
@@ -53,9 +57,9 @@ function displayInventory() {
             <td>${item.description}</td>
             <td>
                 ${isAdmin ? 
-                    `<button onclick="editItem(${index})">Edit</button>
-                     <button onclick="deleteItem(${index})">Delete</button>` :
-                    `<button onclick="reportLow(${item.id})" ${item.quantity > 5 ? 'disabled' : ''}>Report Low</button>`}
+                    `<button onclick="editItem(${index})" class="btn-neon"><i class="fas fa-edit"></i> Edit</button>
+                     <button onclick="deleteItem(${index})" class="btn-neon-secondary"><i class="fas fa-trash"></i> Delete</button>` :
+                    `<button onclick="reportLow(${item.id})" ${item.quantity > 5 ? 'disabled' : ''} class="btn-neon"><i class="fas fa-exclamation-triangle"></i> Report Low</button>`}
             </td>
         `;
         tableBody.appendChild(row);
@@ -79,8 +83,9 @@ async function saveItem() {
         await saveInventory();
         displayInventory();
         clearForm();
+        showFeedback('Item saved successfully', true);
     } else {
-        alert('Please fill in all required fields');
+        showFeedback('Please fill in all required fields', false);
     }
 }
 
@@ -105,6 +110,7 @@ async function deleteItem(index) {
     inventory.splice(index, 1);
     await saveInventory();
     displayInventory();
+    showFeedback('Item deleted successfully', true);
 }
 
 async function saveInventory() {
@@ -122,6 +128,7 @@ async function saveInventory() {
         if (!response.ok) throw new Error('Failed to save inventory');
     } catch (error) {
         console.error('Error saving inventory:', error);
+        showFeedback('Failed to save inventory', false);
     }
 }
 
@@ -133,16 +140,63 @@ async function reportLow(itemId) {
             body: JSON.stringify({ itemId, timestamp: Date.now() })
         });
         if (response.ok) {
-            alert('Low stock reported to admin');
+            showFeedback('Low stock reported to admin', true);
+        } else {
+            showFeedback('Failed to report low stock', false);
         }
     } catch (error) {
         console.error('Error reporting low stock:', error);
+        showFeedback('Error reporting low stock', false);
+    }
+}
+
+async function createStaffAccount() {
+    const username = document.getElementById('newStaffUsername').value;
+    const password = document.getElementById('newStaffPassword').value;
+
+    if (username && password) {
+        try {
+            const response = await fetch('/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, role: 'staff' })
+            });
+            if (response.ok) {
+                showFeedback(`Staff ${username} created successfully`, true);
+                document.getElementById('newStaffUsername').value = '';
+                document.getElementById('newStaffPassword').value = '';
+            } else {
+                showFeedback('Failed to create staff account', false);
+            }
+        } catch (error) {
+            console.error('Error creating staff:', error);
+            showFeedback('Error creating staff account', false);
+        }
+    } else {
+        showFeedback('Please fill in all staff fields', false);
+    }
+}
+
+async function loadAdminNotifications() {
+    try {
+        const response = await fetch('/admin-notifications');
+        const text = await response.text();
+        const notificationsList = document.getElementById('adminNotifications');
+        if (text.trim()) {
+            const actions = text.trim().split('\n');
+            notificationsList.innerHTML = actions.map(action => `<li>${action}</li>`).join('');
+        } else {
+            notificationsList.innerHTML = '<li>No staff actions yet.</li>';
+        }
+    } catch (error) {
+        console.error('Error loading admin notifications:', error);
+        showFeedback('Failed to load staff actions', false);
     }
 }
 
 function populateRequestDropdown() {
     const select = document.getElementById('requestItemId');
-    select.innerHTML = '<option value="">Select Item</option>' + 
+    select.innerHTML = '<option value="" disabled selected>Select Item</option>' + 
         inventory.map(item => `<option value="${item.id}">${item.name} (Qty: ${item.quantity})</option>`).join('');
 }
 
@@ -152,7 +206,7 @@ async function submitRequest() {
     const reason = document.getElementById('requestReason').value;
 
     if (!itemId || isNaN(newQty) || !reason) {
-        alert('Please fill in all request fields');
+        showFeedback('Please fill in all request fields', false);
         return;
     }
 
@@ -163,51 +217,23 @@ async function submitRequest() {
             body: JSON.stringify({ itemId, newQty, reason, timestamp: Date.now() })
         });
         if (response.ok) {
-            alert('Adjustment request submitted');
+            showFeedback('Adjustment request submitted', true);
             document.getElementById('requestItemId').value = '';
             document.getElementById('requestQty').value = '';
             document.getElementById('requestReason').value = '';
+        } else {
+            showFeedback('Failed to submit adjustment request', false);
         }
     } catch (error) {
         console.error('Error submitting request:', error);
+        showFeedback('Error submitting request', false);
     }
 }
 
-async function createStaffAccount() {
-    const username = document.getElementById('newStaffUsername').value;
-    const password = document.getElementById('newStaffPassword').value;
-    const role = 'staff'; // Fixed to staff only
-
-    if (!username || !password) {
-        alert('Please enter both username and password');
-        return;
-    }
-
-    try {
-        const checkResponse = await fetch('/users');
-        const text = await checkResponse.text();
-        const users = text.trim().split('\n').map(line => line.split(':')[0]);
-
-        if (users.includes(username)) {
-            alert('Username already exists!');
-            return;
-        }
-
-        const response = await fetch('/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, role })
-        });
-
-        if (response.ok) {
-            alert('Staff account created successfully!');
-            document.getElementById('newStaffUsername').value = '';
-            document.getElementById('newStaffPassword').value = '';
-        } else {
-            alert('Failed to create staff account');
-        }
-    } catch (error) {
-        console.error('Error creating staff account:', error);
-        alert('Error during staff account creation');
-    }
+function showFeedback(message, isSuccess) {
+    const feedback = document.createElement('div');
+    feedback.className = `feedback ${isSuccess ? 'success' : 'error'}`;
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+    setTimeout(() => feedback.remove(), 3000);
 }

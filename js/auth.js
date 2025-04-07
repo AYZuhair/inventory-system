@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     
-    // Check if loginForm exists
     if (!loginForm) {
         console.error('Login form not found in the DOM');
         return;
@@ -12,6 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         const role = document.getElementById('role').value;
+
+        if (!role) {
+            showFeedback('Please select a role', false);
+            return;
+        }
 
         try {
             const response = await fetch('/users');
@@ -29,13 +33,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (user) {
                 localStorage.setItem('currentUser', JSON.stringify(user));
-                window.location.href = role === 'admin' ? 'admin.html' : 'staff.html';
+                showFeedback('Login successful', true);
+                setTimeout(() => {
+                    window.location.href = role === 'admin' ? 'admin.html' : 'staff.html';
+                }, 1000);
             } else {
-                alert('Invalid credentials');
+                showFeedback('Invalid credentials', false);
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('Error during login');
+            showFeedback('Error during login', false);
         }
     });
 });
+
+function showFeedback(message, isSuccess) {
+    const feedback = document.createElement('div');
+    feedback.className = `feedback ${isSuccess ? 'success' : 'error'}`;
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+    setTimeout(() => feedback.remove(), 3000);
+}

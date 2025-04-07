@@ -3,36 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Panel</title>
+    <title>Staff Portal</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Staff Panel</h1>
-        <button id="logout">Logout</button>
-        <div class="inventory-list">
-            <h2>Inventory</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="inventoryTable"></tbody>
-            </table>
-        </div>
-        <div class="request-form">
-            <h2>Request Quantity Adjustment</h2>
-            <select id="requestItemId"></select>
-            <input type="number" id="requestQty" placeholder="New Quantity">
-            <textarea id="requestReason" placeholder="Reason for change"></textarea>
-            <button onclick="submitRequest()">Submit Request</button>
-        </div>
+    <div class="dash-wrapper">
+        <header class="dash-header">
+            <h1><i class="fas fa-eye"></i> Staff Portal</h1>
+            <button id="logout" class="btn-neon-secondary"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </header>
+        
+        <section class="panel">
+            <h2><i class="fas fa-boxes"></i> Inventory View</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryTable"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2><i class="fas fa-edit"></i> Request Adjustment</h2>
+            <div class="form-container">
+                <div class="input-wrapper">
+                    <i class="fas fa-box input-icon"></i>
+                    <select id="requestItemId"></select>
+                    <span class="input-highlight"></span>
+                </div>
+                <div class="input-wrapper">
+                    <i class="fas fa-cubes input-icon"></i>
+                    <input type="number" id="requestQty" placeholder="New Quantity">
+                    <span class="input-highlight"></span>
+                </div>
+                <div class="input-wrapper full-width">
+                    <i class="fas fa-comment input-icon"></i>
+                    <textarea id="requestReason" placeholder="Reason for change"></textarea>
+                    <span class="input-highlight"></span>
+                </div>
+                <button onclick="submitRequest()" class="btn-neon"><i class="fas fa-paper-plane"></i> Submit</button>
+            </div>
+        </section>
     </div>
     <script src="js/inventory.js"></script>
 </body>

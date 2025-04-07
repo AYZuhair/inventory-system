@@ -3,21 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory System - Login</title>
+    <title>Inventory Access</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Inventory System Login</h1>
-        <form id="loginForm">
-            <input type="text" id="username" placeholder="Username" required>
-            <input type="password" id="password" placeholder="Password" required>
-            <select id="role">
-                <option value="admin">Admin</option>
-                <option value="staff">Staff</option>
-            </select>
-            <button type="submit">Login</button>
-        </form>
+    <div class="auth-wrapper">
+        <div class="auth-panel">
+            <div class="auth-header">
+                <h1><i class="fas fa-shield-alt"></i> Inventory Access</h1>
+                <div class="auth-subtitle">Secure System Entry</div>
+            </div>
+            <form id="loginForm" class="auth-form">
+                <div class="input-wrapper">
+                    <i class="fas fa-user input-icon"></i>
+                    <input type="text" id="username" placeholder="Username" required>
+                    <span class="input-highlight"></span>
+                </div>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <span class="input-highlight"></span>
+                </div>
+                <div class="input-wrapper select-wrapper">
+                    <i class="fas fa-user-shield input-icon"></i>
+                    <select id="role">
+                        <option value="" disabled selected>Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="staff">Staff</option>
+                    </select>
+                    <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                    <span class="input-highlight"></span>
+                </div>
+                <button type="submit" class="btn-neon">
+                    <i class="fas fa-arrow-right"></i> Enter
+                    <span class="btn-glow"></span>
+                </button>
+            </form>
+            <div class="auth-footer">
+                <span>Protected by Ahmad</span>
+            </div>
+        </div>
+        <div class="auth-background">
+            <div class="circle-accent circle-1"></div>
+            <div class="circle-accent circle-2"></div>
+        </div>
     </div>
     <script src="js/auth.js"></script>
 </body>
