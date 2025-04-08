@@ -1,10 +1,20 @@
 let inventory = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+    const expectedRole = window.location.pathname.includes('admin.html') ? 'admin' : 'staff';
+
+    if (!token || role !== expectedRole) {
+        window.location.href = 'index.html';
+        return;
+    }
+
     const logoutBtn = document.getElementById('logout');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('currentUser');
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
             window.location.href = 'index.html';
         });
     }
@@ -17,7 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadInventory() {
     try {
-        const response = await fetch('/inventory');
+        const response = await fetch('/inventory', {
+            headers: { 'Authorization': localStorage.getItem('token') }
+        });
         const text = await response.text();
         if (text.trim()) {
             inventory = text.trim().split('\n').map(line => {
@@ -117,7 +129,10 @@ async function saveInventory() {
     try {
         const response = await fetch('/inventory', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('token')
+            },
             body: JSON.stringify({ 
                 items: inventory.map(item => ({
                     ...item,
@@ -136,7 +151,10 @@ async function reportLow(itemId) {
     try {
         const response = await fetch('/report-low', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('token')
+            },
             body: JSON.stringify({ itemId, timestamp: Date.now() })
         });
         if (response.ok) {
@@ -156,10 +174,13 @@ async function createStaffAccount() {
 
     if (username && password) {
         try {
-            const response = await fetch('/users', {
+            const response = await fetch('/create-staff', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, role: 'staff' })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': localStorage.getItem('token')
+                },
+                body: JSON.stringify({ username, password })
             });
             if (response.ok) {
                 showFeedback(`Staff ${username} created successfully`, true);
@@ -179,19 +200,93 @@ async function createStaffAccount() {
 
 async function loadAdminNotifications() {
     try {
-        const response = await fetch('/admin-notifications');
+        const response = await fetch('/admin-notifications', {
+            headers: { 'Authorization': localStorage.getItem('token') }
+        });
         const text = await response.text();
         const notificationsList = document.getElementById('adminNotifications');
+        
         if (text.trim()) {
-            const actions = text.trim().split('\n');
-            notificationsList.innerHTML = actions.map(action => `<li>${action}</li>`).join('');
+            const actions = text.trim().split('\n').map(action => {
+                const [timestamp, ...rest] = action.split(': ');
+                const message = rest.join(': ');
+                
+                // Parse the action type and details
+                let type, details, meta = '';
+                if (message.includes('Low Stock Report')) {
+                    type = 'lowStock';  // Match filter value
+                    const [_, itemInfo] = message.split('Item ID ');
+                    const [itemId, time] = itemInfo.split(' at ');
+                    details = `Staff reported low stock for Item ID: ${itemId}`;
+                    meta = `Reported at: ${new Date(time).toLocaleString()}`;
+                } else if (message.includes('Stock Adjustment Request')) {
+                    type = 'adjustment';  // Match filter value
+                    const [_, rest] = message.split('Item ID ');
+                    const [itemId, qtyInfo] = rest.split(', New Qty ');
+                    const [newQty, reasonInfo] = qtyInfo.split(', Reason: ');
+                    const [reason, time] = reasonInfo.split(' at ');
+                    details = `Adjustment requested for Item ID: ${itemId}`;
+                    meta = `New Quantity: ${newQty} | Reason: ${reason} | At: ${new Date(time).toLocaleString()}`;
+                } else if (message.includes('Staff Creation')) {
+                    type = 'staffCreation';  // Match filter value
+                    const [_, staffInfo] = message.split('Staff Creation: ');
+                    const [username] = staffInfo.split(' (staff) by admin');
+                    details = `New staff account created: ${username}`;
+                    meta = `Created at: ${new Date(timestamp).toLocaleString()}`;
+                } else {
+                    type = 'general';
+                    details = message;
+                    meta = `Occurred at: ${new Date(timestamp).toLocaleString()}`;
+                }
+
+                return { timestamp, type, details, meta };
+            });
+
+            // Sort by timestamp (newest first)
+            actions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            // Initial display
+            displayNotifications(actions);
+
+            // Add filter functionality
+            const filterSelect = document.getElementById('actionFilter');
+            filterSelect.addEventListener('change', () => {
+                const filter = filterSelect.value;
+                const filteredActions = filter === 'all' 
+                    ? actions 
+                    : actions.filter(action => action.type === filter);
+                displayNotifications(filteredActions);
+            });
         } else {
-            notificationsList.innerHTML = '<li>No staff actions yet.</li>';
+            notificationsList.innerHTML = '<div class="notification-item"><div class="notification-details">No staff activity recorded yet.</div></div>';
         }
     } catch (error) {
         console.error('Error loading admin notifications:', error);
         showFeedback('Failed to load staff actions', false);
     }
+}
+
+function displayNotifications(actions) {
+    const notificationsList = document.getElementById('adminNotifications');
+    notificationsList.innerHTML = actions.map(action => `
+        <div class="notification-item ${action.type}">
+            <div class="notification-header">
+                <span class="notification-type">
+                    ${action.type === 'lowStock' ? 'Low Stock' : 
+                      action.type === 'adjustment' ? 'Adjustment Request' : 
+                      action.type === 'staffCreation' ? 'Staff Creation' : 'General'}
+                </span>
+                <span class="notification-time">${new Date(action.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="notification-details">${action.details}</div>
+            <div class="notification-meta">${action.meta}</div>
+        </div>
+    `).join('');
+}
+
+function toggleFilter() {
+    const filterPanel = document.getElementById('filterPanel');
+    filterPanel.style.display = filterPanel.style.display === 'none' ? 'block' : 'none';
 }
 
 function populateRequestDropdown() {
@@ -213,7 +308,10 @@ async function submitRequest() {
     try {
         const response = await fetch('/request-adjustment', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('token')
+            },
             body: JSON.stringify({ itemId, newQty, reason, timestamp: Date.now() })
         });
         if (response.ok) {
@@ -237,3 +335,4 @@ function showFeedback(message, isSuccess) {
     document.body.appendChild(feedback);
     setTimeout(() => feedback.remove(), 3000);
 }
+

@@ -80,10 +80,23 @@
         </section>
 
         <!-- New Section for Admin Notifications -->
-        <section class="panel">
-            <h2><i class="fas fa-bell"></i> Staff Actions</h2>
-            <div class="notifications-wrapper">
-                <ul id="adminNotifications"></ul>
+        <section class="panel notifications-panel">
+            <h2><i class="fas fa-bell"></i> Staff Activity Log</h2>
+            <div class="notifications-container">
+                <div class="notifications-header">
+                    <span class="filter-toggle" onclick="toggleFilter()">
+                        <i class="fas fa-filter"></i> Filter
+                    </span>
+                </div>
+                <div class="filter-panel" id="filterPanel" style="display: none;">
+                    <select id="actionFilter">
+                        <option value="all">All Actions</option>
+                        <option value="lowStock">Low Stock Reports</option>
+                        <option value="adjustment">Adjustment Requests</option>
+                        <option value="staffCreation">Staff Creations</option>
+                    </select>
+                </div>
+                <div class="notifications-list" id="adminNotifications"></div>
             </div>
         </section>
     </div>

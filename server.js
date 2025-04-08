@@ -1,29 +1,59 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 const app = express();
+
+// Supabase setup for server-side operations (using service_role key)
+const supabaseUrl = 'https://qjxkhydsmpfvehjmyhhc.supabase.co';
+const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqeGtoeWRzbXBmdmVoam15aGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUzOTc3NjgsImV4cCI6MjA1MDk3Mzc2OH0.5iN66Q7V6ovymRkqX7WfY9zmbnT-EYw3v-1BOV5_ku0';
+const supabaseServer = createClient(supabaseUrl, supabaseServiceKey);
+
+// In-memory store for session tokens (for simplicity; use a database in production)
+const sessions = {};
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
-app.get('/users', async (req, res) => {
-    try {
-        const data = await fs.readFile('data/users.txt', 'utf8');
-        res.send(data);
-    } catch (err) {
-        res.status(500).send('Error reading users');
-    }
-});
+// Middleware to protect routes
+const authenticate = (req, res, next) => {
+    const token = req.headers['authorization'];
+    const session = sessions[token];
 
-app.post('/users', async (req, res) => {
+    if (!token || !session) {
+        return res.status(401).send('Unauthorized: Please log in');
+    }
+
+    req.user = session;
+    next();
+};
+
+// New endpoint for staff creation (server-side with service_role key)
+app.post('/create-staff', authenticate, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send('Forbidden: Admins only');
+    }
+
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).send('Username and password are required');
+    }
+
     try {
-        const { username, password, role } = req.body;
-        const userEntry = `${username}:${password}:${role}\n`;
-        await fs.appendFile('data/users.txt', userEntry);
-        await logAction(`Staff Creation: ${username} (${role}) by admin`);
-        res.status(200).send('User created');
+        const { data, error } = await supabaseServer
+            .from('staff')
+            .insert([{ username, password }]);
+
+        if (error) {
+            console.error('Error creating staff:', error);
+            return res.status(500).send('Error creating staff');
+        }
+
+        await logAction(`Staff Creation: ${username} (staff) by admin`);
+        res.status(200).send('Staff created');
     } catch (err) {
-        res.status(500).send('Error creating user');
+        console.error('Error creating staff:', err);
+        res.status(500).send('Error creating staff');
     }
 });
 
@@ -71,7 +101,6 @@ app.post('/request-adjustment', async (req, res) => {
     }
 });
 
-// New endpoint for admin notifications
 app.get('/admin-notifications', async (req, res) => {
     try {
         const data = await fs.readFile('data/actions.txt', 'utf8');
@@ -81,7 +110,20 @@ app.get('/admin-notifications', async (req, res) => {
     }
 });
 
-// Helper function to log actions
+app.get('/admin.html', authenticate, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send('Forbidden: Admins only');
+    }
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/staff.html', authenticate, (req, res) => {
+    if (req.user.role !== 'staff') {
+        return res.status(403).send('Forbidden: Staff only');
+    }
+    res.sendFile(path.join(__dirname, 'staff.html'));
+});
+
 async function logAction(action) {
     const timestamp = new Date().toISOString();
     const entry = `${timestamp}: ${action}\n`;
