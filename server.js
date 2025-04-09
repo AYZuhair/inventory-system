@@ -4,7 +4,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const app = express();
 
-// Supabase setup for server-side operations (using service_role key)
+// Supabase setup for server-side operations
 const supabaseUrl = 'https://qjxkhydsmpfvehjmyhhc.supabase.co';
 const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqeGtoeWRzbXBmdmVoam15aGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUzOTc3NjgsImV4cCI6MjA1MDk3Mzc2OH0.5iN66Q7V6ovymRkqX7WfY9zmbnT-EYw3v-1BOV5_ku0';
 const supabaseServer = createClient(supabaseUrl, supabaseServiceKey);
@@ -28,7 +28,37 @@ const authenticate = (req, res, next) => {
     next();
 };
 
-// New endpoint for staff creation (server-side with service_role key)
+// Reintroduce /login endpoint to validate with Supabase and generate a session token
+app.post('/login', async (req, res) => {
+    try {
+        const { username, password, role } = req.body;
+        const table = role === 'admin' ? 'admin' : 'staff';
+        const { data, error } = await supabaseServer
+            .from(table)
+            .select('username, password')
+            .eq('username', username)
+            .eq('password', password);
+
+        if (error) {
+            console.error('Error during login:', error);
+            return res.status(500).json({ error: 'Error during login' });
+        }
+
+        if (data && data.length > 0) {
+            // Generate a session token
+            const token = Math.random().toString(36).substring(2) + Date.now();
+            sessions[token] = { username, role };
+            res.json({ token, role });
+        } else {
+            res.status(401).json({ error: 'Invalid credentials' });
+        }
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Error during login' });
+    }
+});
+
+// Staff creation endpoint
 app.post('/create-staff', authenticate, async (req, res) => {
     if (req.user.role !== 'admin') {
         return res.status(403).send('Forbidden: Admins only');
