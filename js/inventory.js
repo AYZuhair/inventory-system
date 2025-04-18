@@ -30,19 +30,14 @@ async function loadInventory() {
         const response = await fetch('/inventory', {
             headers: { 'Authorization': localStorage.getItem('token') }
         });
-        const text = await response.text();
-        if (text.trim()) {
-            inventory = text.trim().split('\n').map(line => {
-                const [id, name, quantity, price, ...desc] = line.split(':');
-                return { 
-                    id: parseInt(id), 
-                    name, 
-                    quantity: parseInt(quantity),
-                    price: parseFloat(price) || 0,
-                    description: desc.join(':') 
-                };
-            });
-        }
+        const data = await response.json();
+        inventory = data.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            description: item.description
+        }));
         displayInventory();
         if (window.location.pathname.includes('staff.html')) {
             populateRequestDropdown();
@@ -86,13 +81,15 @@ async function saveItem() {
     const description = document.getElementById('itemDesc').value;
 
     if (name && !isNaN(quantity) && !isNaN(price)) {
+        let item;
         if (editId) {
             const index = inventory.findIndex(item => item.id === parseInt(editId));
-            inventory[index] = { id: parseInt(editId), name, quantity, price, description };
+            item = inventory[index] = { id: parseInt(editId), name, quantity, price, description };
         } else {
-            inventory.push({ id: Date.now(), name, quantity, price, description });
+            item = { id: Date.now(), name, quantity, price, description };
+            inventory.push(item);
         }
-        await saveInventory();
+        await saveInventory(); // Line ~92
         displayInventory();
         clearForm();
         showFeedback('Item saved successfully', true);
@@ -133,14 +130,9 @@ async function saveInventory() {
                 'Content-Type': 'application/json',
                 'Authorization': localStorage.getItem('token')
             },
-            body: JSON.stringify({ 
-                items: inventory.map(item => ({
-                    ...item,
-                    description: item.description.replace(/:/g, ' ')
-                }))
-            })
+            body: JSON.stringify({ items: inventory })
         });
-        if (!response.ok) throw new Error('Failed to save inventory');
+        if (!response.ok) throw new Error('Failed to save inventory'); // Line ~135
     } catch (error) {
         console.error('Error saving inventory:', error);
         showFeedback('Failed to save inventory', false);
@@ -211,24 +203,25 @@ async function loadAdminNotifications() {
                 const [timestamp, ...rest] = action.split(': ');
                 const message = rest.join(': ');
                 
-                // Parse the action type and details
                 let type, details, meta = '';
                 if (message.includes('Low Stock Report')) {
-                    type = 'lowStock';  // Match filter value
+                    type = 'lowStock';
                     const [_, itemInfo] = message.split('Item ID ');
-                    const [itemId, time] = itemInfo.split(' at ');
-                    details = `Staff reported low stock for Item ID: ${itemId}`;
-                    meta = `Reported at: ${new Date(time).toLocaleString()}`;
+                    const [itemId, itemName] = itemInfo.split(' (');
+                    const name = itemName.slice(0, -1); // Remove trailing ')'
+                    details = `Staff reported low stock for Item ID: ${itemId} (${name})`;
+                    meta = `Reported at: ${new Date(timestamp).toLocaleString()}`;
                 } else if (message.includes('Stock Adjustment Request')) {
-                    type = 'adjustment';  // Match filter value
+                    type = 'adjustment';
                     const [_, rest] = message.split('Item ID ');
                     const [itemId, qtyInfo] = rest.split(', New Qty ');
                     const [newQty, reasonInfo] = qtyInfo.split(', Reason: ');
-                    const [reason, time] = reasonInfo.split(' at ');
-                    details = `Adjustment requested for Item ID: ${itemId}`;
-                    meta = `New Quantity: ${newQty} | Reason: ${reason} | At: ${new Date(time).toLocaleString()}`;
+                    const [reason, name] = reasonInfo.split(' (');
+                    const itemName = name.slice(0, -1); // Remove trailing ')'
+                    details = `Adjustment requested for Item ID: ${itemId} (${itemName})`;
+                    meta = `New Quantity: ${newQty} | Reason: ${reason} | At: ${new Date(timestamp).toLocaleString()}`;
                 } else if (message.includes('Staff Creation')) {
-                    type = 'staffCreation';  // Match filter value
+                    type = 'staffCreation';
                     const [_, staffInfo] = message.split('Staff Creation: ');
                     const [username] = staffInfo.split(' (staff) by admin');
                     details = `New staff account created: ${username}`;
@@ -242,13 +235,9 @@ async function loadAdminNotifications() {
                 return { timestamp, type, details, meta };
             });
 
-            // Sort by timestamp (newest first)
             actions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-            // Initial display
             displayNotifications(actions);
 
-            // Add filter functionality
             const filterSelect = document.getElementById('actionFilter');
             filterSelect.addEventListener('change', () => {
                 const filter = filterSelect.value;
@@ -335,4 +324,3 @@ function showFeedback(message, isSuccess) {
     document.body.appendChild(feedback);
     setTimeout(() => feedback.remove(), 3000);
 }
-

@@ -1,21 +1,20 @@
 const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
 const app = express();
 
-// Supabase setup for server-side operations
+// Supabase setup
 const supabaseUrl = 'https://qjxkhydsmpfvehjmyhhc.supabase.co';
 const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqeGtoeWRzbXBmdmVoam15aGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUzOTc3NjgsImV4cCI6MjA1MDk3Mzc2OH0.5iN66Q7V6ovymRkqX7WfY9zmbnT-EYw3v-1BOV5_ku0';
 const supabaseServer = createClient(supabaseUrl, supabaseServiceKey);
 
-// In-memory store for session tokens (for simplicity; use a database in production)
+// In-memory store for sessions
 const sessions = {};
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
-// Middleware to protect routes
+// Authentication middleware
 const authenticate = (req, res, next) => {
     const token = req.headers['authorization'];
     const session = sessions[token];
@@ -28,7 +27,7 @@ const authenticate = (req, res, next) => {
     next();
 };
 
-// Reintroduce /login endpoint to validate with Supabase and generate a session token
+// Login endpoint
 app.post('/login', async (req, res) => {
     try {
         const { username, password, role } = req.body;
@@ -45,7 +44,6 @@ app.post('/login', async (req, res) => {
         }
 
         if (data && data.length > 0) {
-            // Generate a session token
             const token = Math.random().toString(36).substring(2) + Date.now();
             sessions[token] = { username, role };
             res.json({ token, role });
@@ -70,7 +68,7 @@ app.post('/create-staff', authenticate, async (req, res) => {
     }
 
     try {
-        const { data, error } = await supabaseServer
+        const { error } = await supabaseServer
             .from('staff')
             .insert([{ username, password }]);
 
@@ -79,7 +77,13 @@ app.post('/create-staff', authenticate, async (req, res) => {
             return res.status(500).send('Error creating staff');
         }
 
-        await logAction(`Staff Creation: ${username} (staff) by admin`);
+        await supabaseServer.from('actions').insert([{
+            action_type: 'staffCreation',
+            details: `Staff Creation: ${username}`,
+            created_by: req.user.username,
+            meta: { username }
+        }]);
+
         res.status(200).send('Staff created');
     } catch (err) {
         console.error('Error creating staff:', err);
@@ -87,59 +91,171 @@ app.post('/create-staff', authenticate, async (req, res) => {
     }
 });
 
-app.get('/inventory', async (req, res) => {
+// Inventory endpoints
+app.get('/inventory', authenticate, async (req, res) => {
     try {
-        const data = await fs.readFile('data/inventory.txt', 'utf8');
-        res.send(data);
+        const { data, error } = await supabaseServer
+            .from('inventory')
+            .select('id, name, quantity, price, description');
+
+        if (error) {
+            console.error('Error fetching inventory:', error);
+            return res.status(500).send('Error reading inventory');
+        }
+
+        res.json(data);
     } catch (err) {
+        console.error('Error fetching inventory:', err);
         res.status(500).send('Error reading inventory');
     }
 });
 
-app.post('/inventory', async (req, res) => {
+app.post('/inventory', authenticate, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send('Forbidden: Admins only');
+    }
+
     try {
         const items = req.body.items;
-        const data = items.map(item => `${item.id}:${item.name}:${item.quantity}:${item.price}:${item.description}`).join('\n') + '\n';
-        await fs.writeFile('data/inventory.txt', data);
+        console.log('Received items for upsert:', JSON.stringify(items, null, 2));
+
+        // Validate items
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).send('Items array is required and cannot be empty');
+        }
+
+        for (const item of items) {
+            if (!item.name || typeof item.quantity !== 'number' || typeof item.price !== 'number') {
+                return res.status(400).send('Each item must have a name, quantity, and price');
+            }
+        }
+
+        const { error } = await supabaseServer
+            .from('inventory')
+            .upsert(items, { onConflict: 'id' });
+
+        if (error) {
+            console.error('Supabase error updating inventory:', JSON.stringify(error, null, 2));
+            return res.status(500).send(`Error updating inventory: ${error.message}`);
+        }
+
+        await supabaseServer.from('actions').insert([{
+            action_type: 'inventoryUpdate',
+            details: `Inventory updated by ${req.user.username}`,
+            created_by: req.user.username,
+            meta: { itemCount: items.length }
+        }]);
+
         res.status(200).send('Inventory updated');
     } catch (err) {
+        console.error('Unexpected error updating inventory:', err);
         res.status(500).send('Error updating inventory');
     }
 });
 
-app.post('/report-low', async (req, res) => {
+// Low stock report endpoint
+app.post('/report-low', authenticate, async (req, res) => {
     try {
         const { itemId, timestamp } = req.body;
-        const entry = `${itemId}:${timestamp}\n`;
-        await fs.appendFile('data/lowstock.txt', entry);
-        await logAction(`Low Stock Report: Item ID ${itemId} at ${new Date(timestamp).toISOString()}`);
+        const { error } = await supabaseServer
+            .from('lowstock')
+            .insert([{ item_id: itemId, timestamp: new Date(timestamp), reported_by: req.user.username }]);
+
+        if (error) {
+            console.error('Error reporting low stock:', error);
+            return res.status(500).send('Error reporting low stock');
+        }
+
+        const { data: item } = await supabaseServer
+            .from('inventory')
+            .select('name')
+            .eq('id', itemId)
+            .single();
+
+        await supabaseServer.from('actions').insert([{
+            action_type: 'lowStock',
+            details: `Low Stock Report: Item ID ${itemId} (${item.name})`,
+            created_by: req.user.username,
+            meta: { itemId, timestamp: new Date(timestamp).toISOString() }
+        }]);
+
         res.status(200).send('Low stock reported');
     } catch (err) {
+        console.error('Error reporting low stock:', err);
         res.status(500).send('Error reporting low stock');
     }
 });
 
-app.post('/request-adjustment', async (req, res) => {
+// Adjustment request endpoint
+app.post('/request-adjustment', authenticate, async (req, res) => {
     try {
         const { itemId, newQty, reason, timestamp } = req.body;
-        const entry = `${itemId}:${newQty}:${reason}:${timestamp}\n`;
-        await fs.appendFile('data/requests.txt', entry);
-        await logAction(`Stock Adjustment Request: Item ID ${itemId}, New Qty ${newQty}, Reason: ${reason} at ${new Date(timestamp).toISOString()}`);
+        const { error } = await supabaseServer
+            .from('requests')
+            .insert([{
+                item_id: itemId,
+                new_quantity: newQty,
+                reason,
+                timestamp: new Date(timestamp),
+                requested_by: req.user.username
+            }]);
+
+        if (error) {
+            console.error('Error requesting adjustment:', error);
+            return res.status(500).send('Error requesting adjustment');
+        }
+
+        const { data: item } = await supabaseServer
+            .from('inventory')
+            .select('name')
+            .eq('id', itemId)
+            .single();
+
+        await supabaseServer.from('actions').insert([{
+            action_type: 'adjustment',
+            details: `Stock Adjustment Request: Item ID ${itemId} (${item.name}), New Qty ${newQty}, Reason: ${reason}`,
+            created_by: req.user.username,
+            meta: { itemId, newQty, reason, timestamp: new Date(timestamp).toISOString() }
+        }]);
+
         res.status(200).send('Adjustment requested');
     } catch (err) {
+        console.error('Error requesting adjustment:', err);
         res.status(500).send('Error requesting adjustment');
     }
 });
 
-app.get('/admin-notifications', async (req, res) => {
+// Admin notifications endpoint
+app.get('/admin-notifications', authenticate, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send('Forbidden: Admins only');
+    }
+
     try {
-        const data = await fs.readFile('data/actions.txt', 'utf8');
-        res.send(data);
+        const { data, error } = await supabaseServer
+            .from('actions')
+            .select('timestamp, action_type, details, meta')
+            .order('timestamp', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching actions:', error);
+            return res.status(500).send('Error reading admin notifications');
+        }
+
+        const formattedData = data.map(action => {
+            const timestamp = action.timestamp;
+            const message = action.details;
+            return `${timestamp}: ${message}`;
+        }).join('\n');
+
+        res.send(formattedData);
     } catch (err) {
+        console.error('Error fetching actions:', err);
         res.status(500).send('Error reading admin notifications');
     }
 });
 
+// Protected routes
 app.get('/admin.html', authenticate, (req, res) => {
     if (req.user.role !== 'admin') {
         return res.status(403).send('Forbidden: Admins only');
@@ -153,11 +269,5 @@ app.get('/staff.html', authenticate, (req, res) => {
     }
     res.sendFile(path.join(__dirname, 'staff.html'));
 });
-
-async function logAction(action) {
-    const timestamp = new Date().toISOString();
-    const entry = `${timestamp}: ${action}\n`;
-    await fs.appendFile('data/actions.txt', entry);
-}
 
 app.listen(3000, () => console.log('Server running on port 3000'));
