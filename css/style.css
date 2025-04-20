@@ -536,3 +536,9 @@ td .btn-neon, td .btn-neon-secondary {
 .notifications-list::-webkit-scrollbar-thumb:hover {
     background: #1d7d74;
 }
+
+.captcha-wrapper {
+    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+}
