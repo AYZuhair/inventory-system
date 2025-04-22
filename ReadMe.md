@@ -1,5 +1,6 @@
 Inventory Management System (IMS) User Manual
 
+![Uploading Screenshot 2025-04-22 at 2.37.53 PM.png…]()
 
 Version: 1.0.0Last Updated: April 20, 2025Repository: git clone https://github.com/AYZuhair/inventory-system.git
 Table of Contents
